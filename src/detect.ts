@@ -13,6 +13,7 @@
  *   evidence only, since wording and language are free for the attacker to change.
  */
 import { matchPhrases, scriptsUsed, findEncodedBlobs, decodeTagChars, INVISIBLE_CHARS, VARIATION_SELECTOR_RUN } from "./patterns.ts";
+import { listEntries, readEntry, type ZipEntry } from "./zip.ts";
 
 export type Severity = "high" | "medium" | "low";
 
@@ -48,18 +49,18 @@ const PART_VISIBILITY: Array<[RegExp, string, boolean]> = [
   [/^customXml\/item\d*\.xml$/, "embedded custom XML", false],
 ];
 
-async function zipList(path: string): Promise<string[]> {
-  const proc = Bun.spawn(["unzip", "-Z1", path], { stderr: "pipe" });
-  const out = await new Response(proc.stdout).text();
-  if ((await proc.exited) !== 0) throw new Error("not a readable zip container");
-  return out.split("\n").map((l) => l.trim()).filter(Boolean);
+/** One open container: the file bytes plus its parsed directory. */
+type Container = { buf: Buffer; entries: ZipEntry[] };
+
+async function openContainer(path: string): Promise<Container> {
+  const buf = Buffer.from(await Bun.file(path).arrayBuffer());
+  return { buf, entries: listEntries(buf) };
 }
 
-async function zipRead(path: string, entry: string): Promise<string> {
-  const proc = Bun.spawn(["unzip", "-p", path, entry], { stderr: "pipe" });
-  const out = await new Response(proc.stdout).text();
-  await proc.exited;
-  return out;
+function readPart(container: Container, name: string): string {
+  const entry = container.entries.find((e) => e.name === name);
+  if (!entry) return "";
+  return readEntry(container.buf, entry)?.toString("utf8") ?? "";
 }
 
 function decodeEntities(s: string): string {
@@ -228,9 +229,11 @@ export async function scanDocx(path: string): Promise<ScanResult> {
   const result: ScanResult = { file: path, findings: [], visibleChars: 0, hiddenChars: 0 };
   const add = (f: Finding) => result.findings.push(f);
 
+  let container: Container;
   let entries: string[];
   try {
-    entries = await zipList(path);
+    container = await openContainer(path);
+    entries = container.entries.map((e) => e.name);
   } catch {
     // Not a zip: either legacy binary .doc/.rtf, or an encrypted OOXML wrapper.
     const head = new Uint8Array(await Bun.file(path).slice(0, 8).arrayBuffer());
@@ -270,7 +273,7 @@ export async function scanDocx(path: string): Promise<ScanResult> {
     if (!match && !isOtherWordXml) continue;
 
     const [, label, readerVisible] = match ?? [null, `other part (${entry})`, false];
-    const xml = await zipRead(path, entry);
+    const xml = readPart(container, entry);
     if (!xml) continue;
 
     if (/^docProps\//.test(entry) || /^customXml\//.test(entry)) {

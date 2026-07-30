@@ -5,3 +5,4 @@ node_modules/
 *.findings.json
 scan-log.ndjson
 share/
+gh-push.ts

@@ -16,6 +16,10 @@ bun make-test-docx.ts && bun test.ts       # regenerate corpus, run regressions
 
 Exit code 1 means findings, so it gates a pipeline directly.
 
+Requires [Bun](https://bun.sh). No dependencies, no external commands, no network
+calls: the zip container is parsed directly, so it behaves identically on
+Windows, macOS, and Linux, and it never sends a document anywhere.
+
 ## Two layers, deliberately unequal
 
 **Layer 1, HIGH severity, language-independent.** Text the file itself declares
