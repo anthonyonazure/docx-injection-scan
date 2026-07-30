@@ -1,0 +1,40 @@
+name: gauntlet
+on:
+  push:
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  secrets:
+    name: secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    container:
+      image: zricethezav/gitleaks:latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      # gitleaks CLI is license-free; the gitleaks-action wrapper is NOT (it requires
+      # a paid GITLEAKS_LICENSE on org accounts). Run the binary directly to avoid that.
+      - run: gitleaks detect --source . --redact --exit-code 1 --no-banner
+  deps:
+    name: dependency CVEs (osv-scanner)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: scan lockfiles for known vulnerabilities
+        run: |
+          curl -sSfL -o osv-scanner \
+            https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64
+          chmod +x osv-scanner
+          set +e
+          ./osv-scanner scan source --recursive ./
+          code=$?
+          set -e
+          # 0 = clean. 1 = vulnerabilities found, and that must fail the build.
+          # 128 = no package manifests in this repo, which is not a defect.
+          if [ "$code" = "128" ]; then
+            echo "No dependency manifests found — nothing to scan."
+            exit 0
+          fi
+          exit $code
