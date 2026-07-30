@@ -1,0 +1,7 @@
+testdocs/
+.stage/
+_quarantine/
+node_modules/
+*.findings.json
+scan-log.ndjson
+share/

@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Custom sensitive information type: AI Prompt Injection Indicators
+
+  Scope note, important: Microsoft Purview evaluates the EXTRACTED TEXT of a file.
+  It cannot see that text is white-on-white, 1pt, or hidden behind an image. That
+  is an advantage and a limit at once - the invisible payload IS inspected, because
+  invisible text is still text, but the invisibility itself cannot be used as a
+  signal. Formatting-based detection has to happen in the pre-upload scanner.
+
+  Consequence: this rule package is the language-dependent layer. Treat it as
+  telemetry and a coarse gate, never as the only wall.
+
+  Deploy: see DEPLOY.md in this folder. Test in simulation mode first.
+-->
+<RulePackage xmlns="http://schemas.microsoft.com/office/2011/mce">
+
+  <RulePack id="0EB00CAA-71B8-433A-B8AD-6B0C2F5BC523">
+    <Version major="1" minor="0" build="0" revision="0"/>
+    <Publisher id="5BF60862-ECDF-4706-8456-70A64BF5C5C0"/>
+    <Details defaultLangCode="en-us">
+      <LocalizedDetails langcode="en-us">
+        <!-- Replace with your own organisation name before uploading. -->
+        <PublisherName>YOUR ORGANISATION</PublisherName>
+        <Name>AI Prompt Injection Indicators</Name>
+        <Description>Detects text that addresses an AI assistant rather than a human reader, in any of fourteen languages, including payloads hidden in invisible formatting.</Description>
+      </LocalizedDetails>
+    </Details>
+  </RulePack>
+
+  <Rules>
+
+    <Entity id="4FFF7BD2-62E1-4EB5-BD84-87FEAA517F7C" patternsProximity="300" recommendedConfidence="75">
+
+      <!-- 85: an override instruction sitting near an AI-specific noun. -->
+      <Pattern confidenceLevel="85">
+        <IdMatch idRef="Regex_injection_override"/>
+        <Match idRef="Keyword_ai_nouns"/>
+      </Pattern>
+
+      <!-- 85: an instruction to hide something from the user, near an AI noun.
+           Concealment is the single strongest tell: no legitimate document tells
+           its own reader-facing tooling to withhold information. -->
+      <Pattern confidenceLevel="85">
+        <IdMatch idRef="Regex_conceal_from_user"/>
+        <Match idRef="Keyword_ai_nouns"/>
+      </Pattern>
+
+      <!-- 85: raw chat-protocol delimiters have no business in a business document. -->
+      <Pattern confidenceLevel="85">
+        <IdMatch idRef="Keyword_chat_delimiters"/>
+      </Pattern>
+
+      <!-- 75: override instruction on its own. -->
+      <Pattern confidenceLevel="75">
+        <IdMatch idRef="Regex_injection_override"/>
+      </Pattern>
+
+      <!-- 75: role reassignment near an AI noun. -->
+      <Pattern confidenceLevel="75">
+        <IdMatch idRef="Regex_role_reassignment"/>
+        <Match idRef="Keyword_ai_nouns"/>
+      </Pattern>
+
+      <!-- 65: a reference to the model's own control channel, plus an AI noun. -->
+      <Pattern confidenceLevel="65">
+        <IdMatch idRef="Regex_system_prompt_reference"/>
+        <Match idRef="Keyword_ai_nouns"/>
+      </Pattern>
+
+      <!-- 65: conditional trigger wording plus an AI noun. Dormant payloads wait
+           for a specific question, which is what this shape describes. -->
+      <Pattern confidenceLevel="65">
+        <IdMatch idRef="Regex_conditional_trigger"/>
+        <Match idRef="Keyword_ai_nouns"/>
+      </Pattern>
+
+    </Entity>
+
+    <!-- Override of prior instructions, fourteen languages. -->
+    <Regex id="Regex_injection_override">(?i)(ignore|disregard|forget|override|omit)\s{1,3}(all\s{1,3}|any\s{1,3}|the\s{1,3}){0,2}(previous|prior|above|earlier|preceding|foregoing)\s{1,3}(instruction|prompt|rule|direction|command|guideline)|(?i)(ignora|olvida|omite)\s{1,3}(todas\s{1,3}){0,1}(las\s{1,3}){0,1}(instrucciones|indicaciones|reglas)\s{1,3}(anteriores|previas)|(?i)(ignorez|ignore|oubliez|oublie)\s{1,3}(toutes\s{1,3}){0,1}(les\s{1,3}){0,1}(instructions|consignes)\s{1,3}(precedentes|anterieures|pr..c..dentes)|(?i)(ignoriere|vergiss|missachte)\s{1,3}(alle\s{1,3}){0,1}(vorherigen|bisherigen)\s{1,3}(anweisungen|regeln)|(?i)(ignore|esqueca|desconsidere)\s{1,3}(todas\s{1,3}){0,1}(as\s{1,3}){0,1}(instrucoes|regras)\s{1,3}(anteriores|previas)|(?i)(ignora|dimentica)\s{1,3}(tutte\s{1,3}){0,1}(le\s{1,3}){0,1}(istruzioni|regole)\s{1,3}(precedenti)|(?i)(negeer|vergeet)\s{1,3}(alle\s{1,3}){0,1}(vorige|eerdere)\s{1,3}(instructies|opdrachten)|(?i)(zignoruj|zapomnij)\s{1,3}(wszystkie\s{1,3}){0,1}(poprzednie|wczesniejsze)\s{1,3}(instrukcje|polecenia)|(?i)(onceki|tum)\s{1,3}(talimatlari|komutlari)\s{1,3}(yoksay|unut)|(игнорируй|забудь|не учитывай)\s{0,3}(все\s{0,3}){0,1}(предыдущие|прежние)\s{0,3}(инструкции|указания|правила)|(忽略|无视|忘记)(之前|以上|所有|先前){0,2}(的){0,1}(指令|指示|提示|规则)|(以前|これまで)(の){0,1}(指示|命令|プロンプト)(を){0,1}(無視|忘れ)|(이전|모든)\s{0,1}(지시|명령|프롬프트)(를|을){0,1}\s{0,1}(무시|잊)|(تجاهل|انس)\s{0,3}(كل\s{0,3}){0,1}(التعليمات|الأوامر)\s{0,3}(السابقة){0,1}</Regex>
+
+    <!-- Instruction to withhold information from the human reader. -->
+    <Regex id="Regex_conceal_from_user">(?i)(do not|don't|dont|never|avoid)\s{1,3}(ever\s{1,3}){0,1}(tell|reveal|mention|disclose|show|inform|report|display|repeat)[^.!?]{0,40}(user|human|reader|anyone|recipient)|(?i)no\s{1,3}(le\s{1,3}){0,1}(reveles|menciones|digas|muestres|informes)[^.!?]{0,30}(usuario|nadie)|(?i)ne\s{1,3}(revelez|revele|mentionnez|dites|montrez)[^.!?]{0,30}(utilisateur|personne)|(?i)(nicht|niemals)[^.!?]{0,35}(erwahne|verrate|zeige|sage)[^.!?]{0,25}(benutzer|nutzer|niemandem)|(不要|切勿|请勿)[^。!?]{0,20}(告诉|透露|提及|显示)[^。!?]{0,10}(用户|使用者|任何人)|(не сообщай|не говори|не раскрывай)[^.!?]{0,35}(пользовател|никому)|(?i)(keep|hold)\s{1,3}(this|it)\s{1,3}(secret|hidden|confidential)\s{0,3}(from){0,1}[^.!?]{0,25}(user|reader|human)</Regex>
+
+    <!-- Reassignment of the assistant's role or persona. -->
+    <Regex id="Regex_role_reassignment">(?i)(you are|you're|from now on you are|act as|behave as|pretend to be|roleplay as)\s{1,3}(now\s{1,3}){0,1}(a|an|the)\s{1,3}[^.!?]{0,40}(assistant|agent|model|bot|system|copilot)|(?i)(eres|actua como|comportate como)\s{1,3}[^.!?]{0,40}(asistente|agente|modelo)|(?i)(tu es|agis comme|comporte-toi comme)\s{1,3}[^.!?]{0,40}(assistant|agent|modele)|(?i)(du bist|verhalte dich wie|agiere als)\s{1,3}[^.!?]{0,40}(assistent|agent|modell)|(你现在是|你是|扮演)[^。!?]{0,20}(助手|助理|代理|模型)|(?i)(new|updated|revised)\s{1,3}(system\s{1,3}){0,1}(instruction|persona|role|directive)s{0,1}\s{0,3}:</Regex>
+
+    <!-- Reference to the model's own control channel. -->
+    <Regex id="Regex_system_prompt_reference">(?i)(system|developer|initial|original|hidden|internal)[\s\-]{0,2}(prompt|message|instruction|persona|directive)|(?i)(override|update|replace|append to)\s{1,3}(your\s{1,3}){0,1}(system|core|base)\s{1,3}(prompt|instruction|rule)|(системн\w{0,4})\s{0,2}(промпт|инструкц\w{0,4})|(系统|系統)(提示词|提示|指令)|(システム)(プロンプト|指示)|(시스템)\s{0,1}(프롬프트|지시)</Regex>
+
+    <!-- Conditional trigger, the shape of a dormant payload. -->
+    <Regex id="Regex_conditional_trigger">(?i)(when|whenever|if)\s{1,3}(the\s{1,3}){0,1}(user|someone|anyone|they|a human)\s{1,3}(asks|requests|mentions|says|queries|inquires|wants)|(?i)(cuando|si)\s{1,3}(el\s{1,3}){0,1}usuario\s{1,3}(pregunte|pida|mencione)|(?i)(quand|lorsque|si)\s{1,3}(l'){0,1}utilisateur\s{1,3}(demande|pose|mentionne)|(当|如果)[^。!?]{0,15}(用户|使用者)[^。!?]{0,10}(询问|问|提到|要求)</Regex>
+
+    <!-- Chat-protocol delimiters and framing markers. -->
+    <Keyword id="Keyword_chat_delimiters">
+      <Group matchStyle="string">
+        <Term>&lt;|im_start|&gt;</Term>
+        <Term>&lt;|im_end|&gt;</Term>
+        <Term>&lt;|system|&gt;</Term>
+        <Term>[INST]</Term>
+        <Term>[/INST]</Term>
+        <Term>### Instruction:</Term>
+        <Term>### System:</Term>
+        <Term>&lt;system&gt;</Term>
+        <Term>&lt;/system&gt;</Term>
+        <Term>&lt;assistant&gt;</Term>
+        <Term>Human:</Term>
+        <Term>Assistant:</Term>
+        <Term>BEGIN SYSTEM PROMPT</Term>
+        <Term>END SYSTEM PROMPT</Term>
+      </Group>
+    </Keyword>
+
+    <!-- Product and concept nouns. These survive translation, because model names
+         are loanwords in every language. -->
+    <Keyword id="Keyword_ai_nouns">
+      <Group matchStyle="string">
+        <Term>copilot</Term>
+        <Term>chatgpt</Term>
+        <Term>openai</Term>
+        <Term>claude</Term>
+        <Term>gemini</Term>
+        <Term>grok</Term>
+        <Term>llama</Term>
+        <Term>mistral</Term>
+        <Term>perplexity</Term>
+        <Term>large language model</Term>
+        <Term>language model</Term>
+        <Term>ai assistant</Term>
+        <Term>ai agent</Term>
+        <Term>system prompt</Term>
+        <Term>prompt</Term>
+        <Term>chatbot</Term>
+        <Term>asistente de ia</Term>
+        <Term>modelo de lenguaje</Term>
+        <Term>assistant ia</Term>
+        <Term>modele de langage</Term>
+        <Term>sprachmodell</Term>
+        <Term>ki-assistent</Term>
+        <Term>языковая модель</Term>
+        <Term>помощник</Term>
+        <Term>промпт</Term>
+        <Term>语言模型</Term>
+        <Term>人工智能助手</Term>
+        <Term>提示词</Term>
+        <Term>助手</Term>
+        <Term>言語モデル</Term>
+        <Term>プロンプト</Term>
+        <Term>アシスタント</Term>
+        <Term>언어 모델</Term>
+        <Term>프롬프트</Term>
+        <Term>مساعد الذكاء الاصطناعي</Term>
+        <Term>نموذج لغوي</Term>
+      </Group>
+    </Keyword>
+
+    <LocalizedStrings>
+      <Resource idRef="4FFF7BD2-62E1-4EB5-BD84-87FEAA517F7C">
+        <Name default="true" langcode="en-us">AI Prompt Injection Indicators</Name>
+        <Description default="true" langcode="en-us">Text that addresses an AI assistant rather than a human reader: instructions to override prior directions, to conceal information from the user, to adopt a new role, or raw chat-protocol delimiters. Covers fourteen languages plus language-neutral product names. Detects payloads regardless of whether they are visible, because Purview inspects extracted text.</Description>
+      </Resource>
+    </LocalizedStrings>
+
+  </Rules>
+</RulePackage>
